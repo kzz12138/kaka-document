@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>咔咔单词本 | Kaka Vocab</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script>
@@ -359,8 +356,8 @@
                                     <p className="text-peach-400 mt-4 text-sm animate-pulse">点击翻看答案</p>
                                 </div>
 
-                                {/* Back */}
-                                <div className="absolute inset-0 backface-hidden bg-peach-50 rounded-3xl shadow-xl border-b-4 border-peach-300 flex flex-col items-center justify-center p-8" style={{ transform: 'rotateY(180deg)' }}>
+                                {/* Back - **已移除 style={{ transform: 'rotateY(180deg)' }}** */}
+                                <div className="absolute inset-0 backface-hidden bg-peach-50 rounded-3xl shadow-xl border-b-4 border-peach-300 flex flex-col items-center justify-center p-8">
                                     <h3 className="text-2xl font-bold text-peach-600 mb-2">{currentWord.chinese}</h3>
                                     <div className="flex items-center gap-2 mb-6">
                                         <span className="bg-white px-2 py-1 rounded text-sm text-gray-500 border border-peach-100">{currentWord.pos || 'N/A'}</span>
