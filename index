@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>咔咔单词本 | Kaka Vocab</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        peach: {
+                            50: '#fff0f3', // 更粉一点的背景
+                            100: '#ffe4e9',
+                            200: '#fcc2d7',
+                            300: '#faa2c1',
+                            400: '#f783ac',
+                            500: '#f06595', // 更鲜艳的主色
+                            600: '#e64980',
+                        },
+                        cream: '#fff9e6', // 更明显的米黄色背景
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #fff9e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .card-shadow { box-shadow: 0 4px 15px -2px rgba(240, 101, 149, 0.15); }
+        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,228,233, 0.5); }
+        /* Hide scrollbar for clean look */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: #faa2c1; border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // 图标组件
+        const Icons = {
+            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+            Sort: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>,
+            Book: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>,
+            Zap: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>,
+            Volume: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        };
+
+        const App = () => {
+            // State
+            const [words, setWords] = useState([]);
+            const [view, setView] = useState('list'); // 'list' or 'quiz'
+            const [sortMethod, setSortMethod] = useState('date'); // 'date' or 'alpha'
+            
+            // Input State
+            const [english, setEnglish] = useState('');
+            const [chinese, setChinese] = useState('');
+            const [pos, setPos] = useState('');
+            const [pronunciation, setPronunciation] = useState('');
+            const [isFormOpen, setIsFormOpen] = useState(false);
+
+            // Quiz State
+            const [quizStage, setQuizStage] = useState('setup'); // 'setup', 'playing', 'result'
+            const [quizQueue, setQuizQueue] = useState([]);
+            const [currentCardIndex, setCurrentCardIndex] = useState(0);
+            const [isFlipped, setIsFlipped] = useState(false);
+
+            // Load from LocalStorage
+            useEffect(() => {
+                const saved = localStorage.getItem('peach_vocab_words');
+                if (saved) {
+                    setWords(JSON.parse(saved));
+                }
+            }, []);
+
+            // Save to LocalStorage
+            useEffect(() => {
+                localStorage.setItem('peach_vocab_words', JSON.stringify(words));
+            }, [words]);
+
+            const addWord = (e) => {
+                e.preventDefault();
+                if (!english || !chinese) return;
+                
+                const newWord = {
+                    id: Date.now(),
+                    english,
+                    chinese,
+                    pos,
+                    pronunciation,
+                    dateAdded: Date.now()
+                };
+
+                setWords([newWord, ...words]);
+                setEnglish('');
+                setChinese('');
+                setPos('');
+                setPronunciation('');
+                setIsFormOpen(false);
+            };
+
+            const deleteWord = (id) => {
+                if(confirm('确定要删除这个单词吗？')) {
+                    setWords(words.filter(w => w.id !== id));
+                }
+            };
+
+            // Sorting Logic
+            const sortedWords = useMemo(() => {
+                let list = [...words];
+                if (sortMethod === 'date') {
+                    // Newest first
+                    list.sort((a, b) => b.dateAdded - a.dateAdded);
+                } else {
+                    // A-Z
+                    list.sort((a, b) => a.english.localeCompare(b.english));
+                }
+                return list;
+            }, [words, sortMethod]);
+
+            // Quiz Logic
+            const startQuiz = (mode) => {
+                const now = Date.now();
+                const oneDay = 24 * 60 * 60 * 1000;
+                let queue = [];
+
+                if (mode === 'yesterday') {
+                    queue = words.filter(w => (now - w.dateAdded) <= oneDay);
+                } else if (mode === '3days') {
+                    queue = words.filter(w => (now - w.dateAdded) <= (oneDay * 3));
+                } else if (mode === 'random10') {
+                    // Shuffle and take 10
+                    queue = [...words].sort(() => 0.5 - Math.random()).slice(0, 10);
+                }
+
+                if (queue.length === 0) {
+                    alert("这个范围内没有单词哦，快去添加吧！");
+                    return;
+                }
+
+                setQuizQueue(queue);
+                setCurrentCardIndex(0);
+                setIsFlipped(false);
+                setQuizStage('playing');
+            };
+
+            const nextCard = () => {
+                if (currentCardIndex < quizQueue.length - 1) {
+                    setIsFlipped(false);
+                    setTimeout(() => setCurrentCardIndex(prev => prev + 1), 150);
+                } else {
+                    setQuizStage('result');
+                }
+            };
+
+            const playAudio = (text) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                speechSynthesis.speak(utterance);
+            };
+
+            // --- Render Components ---
+
+            const renderHeader = () => (
+                <div className="sticky top-0 z-50 glass px-4 py-3 mb-4 flex justify-between items-center shadow-sm">
+                    <h1 className="text-xl font-bold text-peach-600 tracking-tight flex items-center gap-2">
+                        📸 咔咔单词本
+                    </h1>
+                    <div className="flex bg-peach-100 rounded-full p-1 scale-90 origin-right">
+                        <button 
+                            onClick={() => setView('list')}
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${view === 'list' ? 'bg-white text-peach-600 shadow-sm' : 'text-peach-400 hover:text-peach-500'}`}
+                        >
+                            <span className="flex items-center gap-1"><Icons.Book /> 列表</span>
+                        </button>
+                        <button 
+                            onClick={() => setView('quiz')}
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${view === 'quiz' ? 'bg-white text-peach-600 shadow-sm' : 'text-peach-400 hover:text-peach-500'}`}
+                        >
+                            <span className="flex items-center gap-1"><Icons.Zap /> 抽卡</span>
+                        </button>
+                    </div>
+                </div>
+            );
+
+            const renderWordList = () => (
+                <div className="px-3 pb-24 max-w-md mx-auto">
+                    {/* Controls */}
+                    <div className="flex justify-between items-center mb-3 px-1">
+                        <span className="text-peach-400 text-xs font-medium bg-white px-2 py-1 rounded-lg border border-peach-100 shadow-sm">Total: {words.length}</span>
+                        <button 
+                            onClick={() => setSortMethod(prev => prev === 'date' ? 'alpha' : 'date')}
+                            className="flex items-center gap-1 text-xs bg-white px-2 py-1 rounded-lg border border-peach-200 text-peach-500 hover:bg-peach-50 transition"
+                        >
+                            <Icons.Sort /> {sortMethod === 'date' ? '按日期排序' : '按 A-Z 排序'}
+                        </button>
+                    </div>
+
+                    {/* Add Button */}
+                    <button 
+                        onClick={() => setIsFormOpen(true)}
+                        className="w-full mb-4 py-2.5 border-2 border-dashed border-peach-300 rounded-xl text-peach-400 font-medium hover:bg-peach-50 hover:border-peach-400 transition flex justify-center items-center gap-2 text-sm"
+                    >
+                        <Icons.Plus /> 添加新单词
+                    </button>
+
+                    {/* List */}
+                    <div className="space-y-2.5">
+                        {sortedWords.map(word => (
+                            <div key={word.id} className="bg-white p-3 rounded-xl border border-peach-100 card-shadow relative group hover:border-peach-300 transition-all">
+                                
+                                {/* Top Row: English & Date */}
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold text-gray-800 leading-tight">{word.english}</h3>
+                                        <button onClick={() => playAudio(word.english)} className="text-peach-300 hover:text-peach-500 transition scale-90"><Icons.Volume /></button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-peach-500 bg-peach-50 px-2 py-0.5 rounded-md border border-peach-100">
+                                            {new Date(word.dateAdded).toLocaleDateString()}
+                                        </span>
+                                        <button 
+                                            onClick={() => deleteWord(word.id)}
+                                            className="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition scale-90"
+                                        >
+                                            <Icons.Trash />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bottom Row: Chinese & Meta */}
+                                <div className="flex justify-between items-end">
+                                    <p className="text-gray-600 font-medium text-sm truncate max-w-[70%]">{word.chinese}</p>
+                                    
+                                    <div className="flex items-center gap-1.5 text-xs">
+                                        {word.pos && <span className="bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded border border-gray-100">{word.pos}</span>}
+                                        {word.pronunciation && <span className="font-mono text-gray-400">[{word.pronunciation}]</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {sortedWords.length === 0 && (
+                            <div className="text-center py-10 text-peach-300">
+                                <p>还没有单词哦，快去添加吧！✨</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+
+            const renderAddForm = () => {
+                if (!isFormOpen) return null;
+                return (
+                    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                        <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl animate-slide-up">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold text-gray-700">添加新单词</h2>
+                                <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-600"><Icons.X /></button>
+                            </div>
+                            <form onSubmit={addWord} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-peach-500 uppercase mb-1">英文 (必填)</label>
+                                    <input autoFocus value={english} onChange={e => setEnglish(e.target.value)} className="w-full bg-peach-50 border-none rounded-xl p-3 text-lg font-medium focus:ring-2 focus:ring-peach-300 outline-none placeholder-peach-200" placeholder="Apple" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-peach-500 uppercase mb-1">中文 (必填)</label>
+                                    <input value={chinese} onChange={e => setChinese(e.target.value)} className="w-full bg-peach-50 border-none rounded-xl p-3 text-lg font-medium focus:ring-2 focus:ring-peach-300 outline-none placeholder-peach-200" placeholder="苹果" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">词性 (选填)</label>
+                                        <input value={pos} onChange={e => setPos(e.target.value)} className="w-full bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-gray-200 outline-none" placeholder="n." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">音标 (选填)</label>
+                                        <input value={pronunciation} onChange={e => setPronunciation(e.target.value)} className="w-full bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-gray-200 outline-none" placeholder="/.../" />
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full bg-peach-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-peach-200 hover:bg-peach-600 transition mt-4">
+                                    ✨ 确认添加
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderQuiz = () => {
+                if (quizStage === 'setup') {
+                    return (
+                        <div className="px-6 py-10 max-w-md mx-auto space-y-4">
+                            <h2 className="text-2xl font-bold text-center text-gray-700 mb-8">准备好复习了吗？</h2>
+                            
+                            <button onClick={() => startQuiz('yesterday')} className="w-full bg-white p-6 rounded-2xl border border-peach-100 shadow-sm hover:shadow-md hover:border-peach-300 transition text-left group">
+                                <div className="text-lg font-bold text-gray-800 group-hover:text-peach-500">📅 复习最近 24 小时</div>
+                                <div className="text-gray-400 text-sm mt-1">只看最近一天添加的单词</div>
+                            </button>
+
+                            <button onClick={() => startQuiz('3days')} className="w-full bg-white p-6 rounded-2xl border border-peach-100 shadow-sm hover:shadow-md hover:border-peach-300 transition text-left group">
+                                <div className="text-lg font-bold text-gray-800 group-hover:text-peach-500">🗓️ 复习最近 3 天</div>
+                                <div className="text-gray-400 text-sm mt-1">巩固短期记忆</div>
+                            </button>
+
+                            <button onClick={() => startQuiz('random10')} className="w-full bg-white p-6 rounded-2xl border border-peach-100 shadow-sm hover:shadow-md hover:border-peach-300 transition text-left group">
+                                <div className="text-lg font-bold text-gray-800 group-hover:text-peach-500">🎲 随机抽查 10 个</div>
+                                <div className="text-gray-400 text-sm mt-1">从所有单词中随机抽取</div>
+                            </button>
+                        </div>
+                    );
+                }
+
+                if (quizStage === 'result') {
+                    return (
+                        <div className="px-6 py-20 text-center max-w-md mx-auto">
+                            <div className="text-6xl mb-4">🎉</div>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-2">复习完成！</h2>
+                            <p className="text-gray-500 mb-8">今天又进步了一点点哦。</p>
+                            <button onClick={() => setQuizStage('setup')} className="bg-peach-500 text-white px-8 py-3 rounded-full font-bold shadow-lg shadow-peach-200 hover:bg-peach-600 transition">
+                                再来一次
+                            </button>
+                        </div>
+                    );
+                }
+
+                // Playing State
+                const currentWord = quizQueue[currentCardIndex];
+                
+                return (
+                    <div className="px-4 py-6 max-w-md mx-auto h-[calc(100vh-100px)] flex flex-col">
+                        <div className="flex justify-between text-sm text-peach-400 font-bold uppercase mb-4 px-2">
+                            <span>Quiz Mode</span>
+                            <span>{currentCardIndex + 1} / {quizQueue.length}</span>
+                        </div>
+
+                        {/* Flashcard */}
+                        <div 
+                            className="flex-1 perspective-1000 relative cursor-pointer group" 
+                            onClick={() => setIsFlipped(!isFlipped)}
+                        >
+                            <div className={`w-full h-full relative transition-all duration-500 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`} style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
+                                
+                                {/* Front */}
+                                <div className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-xl border-b-4 border-peach-200 flex flex-col items-center justify-center p-8">
+                                    <span className="text-6xl mb-6">🥑</span>
+                                    <h2 className="text-4xl font-bold text-gray-800 text-center">{currentWord.english}</h2>
+                                    <p className="text-peach-400 mt-4 text-sm animate-pulse">点击翻看答案</p>
+                                </div>
+
+                                {/* Back */}
+                                <div className="absolute inset-0 backface-hidden bg-peach-50 rounded-3xl shadow-xl border-b-4 border-peach-300 flex flex-col items-center justify-center p-8" style={{ transform: 'rotateY(180deg)' }}>
+                                    <h3 className="text-2xl font-bold text-peach-600 mb-2">{currentWord.chinese}</h3>
+                                    <div className="flex items-center gap-2 mb-6">
+                                        <span className="bg-white px-2 py-1 rounded text-sm text-gray-500 border border-peach-100">{currentWord.pos || 'N/A'}</span>
+                                        <span className="font-mono text-gray-500">[{currentWord.pronunciation || '-'}]</span>
+                                        <button onClick={(e) => { e.stopPropagation(); playAudio(currentWord.english); }} className="p-1 bg-white rounded-full text-peach-500"><Icons.Volume /></button>
+                                    </div>
+                                    <div className="w-full flex gap-3 mt-auto">
+                                        <button onClick={(e) => { e.stopPropagation(); nextCard(); }} className="flex-1 bg-white border border-peach-200 text-peach-500 py-3 rounded-xl font-bold hover:bg-peach-100">下一个</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="h-8"></div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="min-h-screen bg-cream">
+                    {renderHeader()}
+                    
+                    {view === 'list' && renderWordList()}
+                    {view === 'quiz' && renderQuiz()}
+                    {renderAddForm()}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
